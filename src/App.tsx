@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, useMemo } from 'react';
 import Navbar from './components/Navbar';
 import Home from './components/Home';
 import About from './components/About';
@@ -7,13 +7,21 @@ import Projects from './components/Projects';
 import Contact from './components/Contact';
 import Footer from './components/Footer';
 import PerformanceIndicator from './components/PerformanceIndicator';
-import ParticleBackground from './components/ParticleBackground';
+import { shouldDisableHeavyEffects } from './utils/performanceOptimizer';
 import './App.css';
 
+const ParticleBackground = React.lazy(() => import('./components/ParticleBackground'));
+
 const App = () => {
+  const showParticles = useMemo(() => !shouldDisableHeavyEffects(), []);
+
   return (
     <div className="App">
-      <ParticleBackground />
+      {showParticles && (
+        <Suspense fallback={null}>
+          <ParticleBackground />
+        </Suspense>
+      )}
       <PerformanceIndicator />
       <Navbar />
       <main>

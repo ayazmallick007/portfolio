@@ -643,7 +643,10 @@ const ImageWrapper = styled.div`
   }
 `;
 
-const Image = styled.img`
+const Image = styled.img.attrs({
+  loading: 'lazy',
+  decoding: 'async'
+})`
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1072,7 +1075,7 @@ const About = () => {
             viewport={{ once: true }}
           >
             <ImageWrapper>
-              <Image src="./me4.png" alt="Profile" />
+              <Image src="/me4.png" alt="Profile" />
             </ImageWrapper>
 
             <StatsContainer>

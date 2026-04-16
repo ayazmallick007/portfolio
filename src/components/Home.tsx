@@ -1,13 +1,12 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { motion, useAnimation } from 'framer-motion';
 import { FaGithub, FaLinkedin, FaTwitter, FaCodepen } from 'react-icons/fa';
 import { HiArrowDown, HiDocumentDownload } from 'react-icons/hi';
 import { Link } from 'react-scroll';
 import Typewriter from 'typewriter-effect';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { Points, PointMaterial } from '@react-three/drei';
-import * as random from 'maath/random/dist/maath-random.esm';
+import { shouldDisableHeavyEffects } from '../utils/performanceOptimizer';
+const HomeParticles = React.lazy(() => import('./HomeParticles'));
 // import { usePerformanceOptimization } from '../hooks/usePerformanceOptimization';
 // import { FrameRateMonitor } from '../utils/performanceOptimizer';
 
@@ -42,61 +41,6 @@ const liquidMove = keyframes`
     border-radius: 60% 40% 50% 60%;
   }
 `;
-
-// Optimized particle system
-const ParticleField = React.memo(({ count = 500, deviceType }) => {
-    const points = useRef();
-    
-    // Memoize particle calculations
-    const { particleCount, particleSize, particleOpacity } = useMemo(() => {
-        let countVal, sizeVal, opacityVal;
-        
-        if (deviceType === 'mobile') {
-            countVal = Math.min(count * 0.2, 150);
-            sizeVal = 0.015;
-            opacityVal = 0.4;
-        } else if (deviceType === 'tablet') {
-            countVal = Math.min(count * 0.4, 250);
-            sizeVal = 0.025;
-            opacityVal = 0.5;
-        } else {
-            countVal = Math.min(count, 500);
-            sizeVal = 0.035;
-            opacityVal = 0.6;
-        }
-        
-        return {
-            particleCount: countVal,
-            particleSize: sizeVal,
-            particleOpacity: opacityVal
-        };
-    }, [deviceType, count]);
-    
-    const sphere = useMemo(() => {
-        return random.inSphere(new Float32Array(particleCount * 3), { radius: 15 });
-    }, [particleCount]);
-
-    useFrame((state, delta) => {
-        if (points.current) {
-            const speed = deviceType === 'mobile' ? 0.05 : deviceType === 'tablet' ? 0.08 : 0.12;
-            points.current.rotation.x += delta * speed;
-            points.current.rotation.y += delta * (speed * 1.5);
-        }
-    });
-
-    return (
-        <Points ref={points} positions={sphere} stride={3} frustumCulled={false}>
-            <PointMaterial
-                transparent
-                color="#64ffda"
-                size={particleSize}
-                sizeAttenuation={true}
-                depthWrite={false}
-                opacity={particleOpacity}
-            />
-        </Points>
-    );
-});
 
 const HomeSection = styled.section`
   min-height: 100vh;
@@ -172,13 +116,14 @@ const HomeSection = styled.section`
   }
 `;
 
-const ParticleBackground = styled.div`
+const ParticleBackground = styled.div<{ $visible: boolean }>`
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   z-index: 0;
+  display: ${({ $visible }) => ($visible ? 'block' : 'none')};
   
   @media (max-width: ${breakpoints.md}) {
     display: none;
@@ -949,12 +894,16 @@ const MemoizedTypewriter = React.memo(() => (
 
 const Home = () => {
     const controls = useAnimation();
-    const [deviceType, setDeviceType] = useState('desktop');
+    const [deviceType, setDeviceType] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
     const [showOrbs, setShowOrbs] = useState(true);
+    const [shouldRenderParticles, setShouldRenderParticles] = useState(false);
 
     useEffect(() => {
+        const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
         const checkDevice = () => {
             const width = window.innerWidth;
+            const reducedMotion = mediaQuery.matches;
+            const allowHeavyFx = !shouldDisableHeavyEffects();
             if (width < 768) {
                 setDeviceType('mobile');
                 setShowOrbs(false);
@@ -965,10 +914,12 @@ const Home = () => {
                 setDeviceType('desktop');
                 setShowOrbs(true);
             }
+            setShouldRenderParticles(width >= 1024 && !reducedMotion && allowHeavyFx);
         };
         
         checkDevice();
         window.addEventListener('resize', checkDevice);
+        mediaQuery.addEventListener('change', checkDevice);
         
         controls.start({
             opacity: 1,
@@ -976,7 +927,10 @@ const Home = () => {
             transition: { duration: 0.8, ease: 'easeOut' }
         });
         
-        return () => window.removeEventListener('resize', checkDevice);
+        return () => {
+            window.removeEventListener('resize', checkDevice);
+            mediaQuery.removeEventListener('change', checkDevice);
+        };
     }, [controls]);
 
     const containerVariants = {
@@ -1006,13 +960,12 @@ const Home = () => {
 
     return (
         <HomeSection id="home">
-            <ParticleBackground>
-                <Canvas 
-                    camera={{ position: [0, 0, 1], fov: 75 }}
-                    performance={{ min: 0.5 }}
-                >
-                    <ParticleField count={500} deviceType={deviceType} />
-                </Canvas>
+            <ParticleBackground $visible={shouldRenderParticles}>
+                {shouldRenderParticles && (
+                    <Suspense fallback={null}>
+                        <HomeParticles deviceType={deviceType} />
+                    </Suspense>
+                )}
             </ParticleBackground>
 
             {showOrbs && (

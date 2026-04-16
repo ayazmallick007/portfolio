@@ -198,7 +198,10 @@ const ImageContainer = styled.div`
   }
 `;
 
-const ProjectImage = styled.img`
+const ProjectImage = styled.img.attrs({
+  loading: 'lazy',
+  decoding: 'async'
+})`
   width: 100%;
   height: 100%;
   object-fit: cover;
